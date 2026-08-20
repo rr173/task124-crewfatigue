@@ -73,26 +73,27 @@ func CountEventsKindYear(ctx context.Context, tx DBTX, crewID int64, kind domain
 
 // EventPayload is the decoded payload of a SEGMENT_LANDED event.
 type EventPayloadSegment struct {
-	SegmentID    int64 `json:"segment_id"`
-	BlockTimeMin int   `json:"block_time_min"`
-	TripID       int64 `json:"trip_id"`
+	SegmentID     int64  `json:"segment_id"`
+	BlockTimeMin  int    `json:"block_time_min"`
+	TripID        int64  `json:"trip_id"`
+	DepartureTime string `json:"departure_time,omitempty"`
 }
 
 // EventPayloadDuty is the decoded payload of a DUTY_CLOSED event.
 type EventPayloadDuty struct {
-	DutyID                  int64 `json:"duty_id"`
-	FDPMin                  int   `json:"fdp_min"`
-	UnforeseenExtensionMin  int   `json:"unforeseen_extension_min"`
-	OweAugmentedRest        bool  `json:"owe_augmented_rest"`
+	DutyID                 int64 `json:"duty_id"`
+	FDPMin                 int   `json:"fdp_min"`
+	UnforeseenExtensionMin int   `json:"unforeseen_extension_min"`
+	OweAugmentedRest       bool  `json:"owe_augmented_rest"`
 }
 
 // EventPayloadRest is the decoded payload of a REST_COMPLETED event.
 type EventPayloadRest struct {
-	RestID       int64  `json:"rest_id"`
-	RestType     string `json:"rest_type"`
-	DurationMin  int    `json:"duration_min"`
-	CoversWeekly bool   `json:"covers_weekly"`
-	CompensatesMin int  `json:"compensates_min"`
+	RestID         int64  `json:"rest_id"`
+	RestType       string `json:"rest_type"`
+	DurationMin    int    `json:"duration_min"`
+	CoversWeekly   bool   `json:"covers_weekly"`
+	CompensatesMin int    `json:"compensates_min"`
 }
 
 // EventPayloadUnforeseen is the decoded payload of an UNFORESEEN_EXTENSION event.

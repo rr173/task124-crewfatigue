@@ -27,9 +27,18 @@ func rebuildSegmentsInWindow(events []*domain.ComplianceEvent, asOf time.Time, w
 		if !ok || p == nil {
 			continue
 		}
+		departure := e.Ts.UTC()
+		if p.DepartureTime != "" {
+			if parsed, err := time.Parse(time.RFC3339Nano, p.DepartureTime); err == nil {
+				departure = parsed.UTC()
+			}
+		}
+		if departure.Before(from) || departure.After(asOf) {
+			continue
+		}
 		out = append(out, domain.FlightSegment{
 			ID: p.SegmentID, TripID: p.TripID, BlockTimeMin: p.BlockTimeMin,
-			ScheduledDep: e.Ts.UTC(),
+			ScheduledDep: departure,
 		})
 	}
 	return out
@@ -128,10 +137,10 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 	// the event ts (rest end / duty release) so compensatory rests clear the
 	// deficits in the order they were made up.
 	type streamEv struct {
-		ts       time.Time
-		isRest   bool
-		credit   int // compensatory minutes (rest only)
-		gap      int // reduced gap (duty only)
+		ts     time.Time
+		isRest bool
+		credit int // compensatory minutes (rest only)
+		gap    int // reduced gap (duty only)
 	}
 	stream := make([]streamEv, 0, len(duties)+len(events))
 	for _, d := range duties {

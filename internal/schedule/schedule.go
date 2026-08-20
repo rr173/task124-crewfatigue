@@ -195,10 +195,14 @@ func (s *Service) CloseDuty(ctx context.Context, dutyID int64, applyUnforeseenMi
 		}
 		// Record SEGMENT_LANDED events for each segment.
 		for _, sg := range dp.Segments {
-			payload := store.EventPayloadSegment{SegmentID: sg.ID, BlockTimeMin: sg.BlockTimeMin, TripID: dp.TripID}
+			departure := sg.ScheduledDep.UTC()
+			if !sg.ActualDep.IsZero() {
+				departure = sg.ActualDep.UTC()
+			}
+			payload := store.EventPayloadSegment{SegmentID: sg.ID, BlockTimeMin: sg.BlockTimeMin, TripID: dp.TripID, DepartureTime: departure.Format(time.RFC3339Nano)}
 			pj, _ := encodeJSON(payload)
 			ev := &domain.ComplianceEvent{
-				CrewID: dp.CrewID, Ts: sg.ScheduledDep.UTC(), Kind: domain.EventSegmentLanded, PayloadJSON: pj,
+				CrewID: dp.CrewID, Ts: departure, Kind: domain.EventSegmentLanded, PayloadJSON: pj,
 			}
 			if _, err := store.AppendEvent(ctx, tx, ev); err != nil {
 				return err
