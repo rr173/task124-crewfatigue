@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>机组飞行值勤与疲劳合规引擎</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>✈️ 机组飞行值勤与疲劳合规引擎</h1>
+  <div class="subtitle">航空机组行程注册 · 值勤期管理 · 疲劳规则评估</div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="crew">机组 / 机型</button>
+  <button class="tab" data-tab="trip">行程 / 航段</button>
+  <button class="tab" data-tab="duty">值勤 / 休息</button>
+  <button class="tab" data-tab="eval">合规评估</button>
+</nav>
+
+<main>
+  <!-- Crew / Aircraft -->
+  <section id="tab-crew" class="panel active">
+    <div class="grid2">
+      <div class="card">
+        <h2>注册机组</h2>
+        <form id="form-crew">
+          <label>姓名<input name="name" placeholder="张伟" required></label>
+          <label>角色<select name="role">
+            <option value="CAPTAIN">CAPTAIN 机长</option>
+            <option value="FIRST_OFFICER">FIRST_OFFICER 副驾驶</option>
+            <option value="RELIEF_PILOT">RELIEF_PILOT 巡航轮班</option>
+          </select></label>
+          <label>基地机场<input name="home_base" placeholder="PEK"></label>
+          <label>本地时区<input name="home_tz" placeholder="Asia/Shanghai" value="Asia/Shanghai" required></label>
+          <button type="submit">注册</button>
+        </form>
+        <h3>机组列表</h3>
+        <table id="crew-table"><thead><tr><th>ID</th><th>姓名</th><th>角色</th><th>基地</th><th>时区</th><th>状态</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="card">
+        <h2>注册机型</h2>
+        <form id="form-aircraft">
+          <label>机型代码<input name="code" placeholder="B738" required></label>
+          <label>休息设施<select name="has_rest_facility">
+            <option value="true">有</option>
+            <option value="false">无</option>
+          </select></label>
+          <label>设施等级<select name="rest_facility_class">
+            <option value="NONE">NONE</option>
+            <option value="CLASS_3">CLASS_3 普通座椅</option>
+            <option value="CLASS_2">CLASS_2 可躺座椅</option>
+            <option value="CLASS_1">CLASS_1 卧铺</option>
+          </select></label>
+          <button type="submit">注册</button>
+        </form>
+        <h3>机型列表</h3>
+        <table id="aircraft-table"><thead><tr><th>代码</th><th>休息设施</th><th>等级</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trip / Segments -->
+  <section id="tab-trip" class="panel">
+    <div class="card">
+      <h2>创建行程</h2>
+      <form id="form-trip">
+        <label>机组 ID<input name="crew_id" type="number" placeholder="1" required></label>
+        <button type="submit">创建行程</button>
+      </form>
+      <h2>追加航段</h2>
+      <form id="form-segment">
+        <label>行程 ID<input name="trip_id" type="number" placeholder="1" required></label>
+        <label>机型<input name="aircraft_type" placeholder="B738" required></label>
+        <label>出发机场<input name="dep_airport" placeholder="PEK"></label>
+        <label>到达机场<input name="arr_airport" placeholder="SHA"></label>
+        <label>计划起飞 (UTC RFC3339)<input name="scheduled_dep" placeholder="2026-08-18T05:00:00Z" required></label>
+        <label>计划到达 (UTC RFC3339)<input name="scheduled_arr" placeholder="2026-08-18T07:00:00Z" required></label>
+        <label>飞行分钟 (留空则按计划计算)<input name="block_time_min" type="number" placeholder="120"></label>
+        <button type="submit">追加航段</button>
+      </form>
+      <h2>行程航段</h2>
+      <form id="form-list-seg">
+        <label>行程 ID<input name="trip_id" type="number" placeholder="1" required></label>
+        <button type="submit">查看航段</button>
+      </form>
+      <table id="segment-table"><thead><tr><th>ID</th><th>机型</th><th>航线</th><th>计划起飞</th><th>计划到达</th><th>飞行(min)</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- Duty / Rest -->
+  <section id="tab-duty" class="panel">
+    <div class="grid2">
+      <div class="card">
+        <h2>创建值勤期</h2>
+        <form id="form-duty">
+          <label>行程 ID<input name="trip_id" type="number" placeholder="1" required></label>
+          <label>增编机组<input name="is_augmented" type="checkbox"></label>
+          <label>分段休息(分钟)<input name="split_break_min" type="number" placeholder="0" value="0"></label>
+          <button type="submit">创建值勤期</button>
+        </form>
+        <h2>关闭值勤期 (落账)</h2>
+        <form id="form-close-duty">
+          <label>值勤期 ID<input name="duty_id" type="number" placeholder="1" required></label>
+          <label>不可预见延长(分钟, 0/120)<input name="unforeseen_min" type="number" placeholder="0" value="0"></label>
+          <button type="submit">关闭值勤期</button>
+        </form>
+        <h3>值勤期列表</h3>
+        <table id="duty-table"><thead><tr><th>ID</th><th>机组</th><th>行程</th><th>报到(UTC)</th><th>解散(UTC)</th><th>FDP</th><th>增编</th><th>状态</th></tr></thead><tbody></tbody></table>
+        <form id="form-list-duty">
+          <label>机组 ID (可选)<input name="crew_id" type="number" placeholder="1"></label>
+          <button type="submit">刷新</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>登记休息期</h2>
+        <form id="form-rest">
+          <label>机组 ID<input name="crew_id" type="number" placeholder="1" required></label>
+          <label>开始 (UTC)<input name="start" placeholder="2026-08-18T08:00:00Z" required></label>
+          <label>结束 (UTC)<input name="end" placeholder="2026-08-18T18:00:00Z" required></label>
+          <label>休息类型<select name="rest_type">
+            <option value="NORMAL">NORMAL</option>
+            <option value="AUGMENTED">AUGMENTED</option>
+            <option value="SPLIT_CREDIT">SPLIT_CREDIT</option>
+            <option value="COMPENSATORY">COMPENSATORY</option>
+          </select></label>
+          <label>覆盖每周休息<input name="covers_weekly" type="checkbox"></label>
+          <button type="submit">登记休息</button>
+        </form>
+        <h3>休息列表</h3>
+        <table id="rest-table"><thead><tr><th>ID</th><th>机组</th><th>开始</th><th>结束</th><th>类型</th><th>分钟</th><th>覆盖每周</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Eval -->
+  <section id="tab-eval" class="panel">
+    <div class="card">
+      <h2>行程合规评估</h2>
+      <form id="form-eval">
+        <label>机组 ID<input name="crew_id" type="number" placeholder="1" required></label>
+        <label>机型<input name="aircraft_type" placeholder="B738" required></label>
+        <label>增编机组<input name="is_augmented" type="checkbox"></label>
+        <label>分段休息(分钟)<input name="split_break_min" type="number" placeholder="0" value="0"></label>
+        <label>评估时刻 (UTC, 留空=now)<input name="as_of" placeholder="2026-08-18T08:00:00Z"></label>
+        <fieldset>
+          <legend>航段 (至少1段)</legend>
+          <textarea name="segments_json" rows="6" placeholder='[{"dep_airport":"PEK","arr_airport":"SHA","scheduled_dep":"2026-08-18T05:00:00Z","scheduled_arr":"2026-08-18T07:00:00Z"}]'></textarea>
+        </fieldset>
+        <button type="submit">评估</button>
+      </form>
+      <div id="eval-result" class="result"></div>
+      <h2>累计与休息负债</h2>
+      <form id="form-cum">
+        <label>机组 ID<input name="crew_id" type="number" placeholder="1" required></label>
+        <button type="submit">查询累计 / 休息负债</button>
+      </form>
+      <div id="cum-result" class="result"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span id="status">就绪</span>
+  <span class="dim">task124-crewfatigue · /health</span>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
