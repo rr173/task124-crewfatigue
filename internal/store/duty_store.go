@@ -25,6 +25,11 @@ func CreateDuty(ctx context.Context, tx DBTX, d *domain.DutyPeriod, segIDs []int
 	if !d.ReleaseTime.After(d.ReportTime) {
 		return 0, fmt.Errorf("%w: release_time must be after report_time", domain.ErrInvariantViolation)
 	}
+	if exists, err := HasDutyForTrip(ctx, tx, d.TripID); err != nil {
+		return 0, err
+	} else if exists {
+		return 0, fmt.Errorf("%w: trip already has a duty period", domain.ErrInvariantViolation)
+	}
 	if d.Status == "" {
 		d.Status = domain.DutyOpen
 	}
@@ -47,6 +52,15 @@ func CreateDuty(ctx context.Context, tx DBTX, d *domain.DutyPeriod, segIDs []int
 		}
 	}
 	return id, nil
+}
+
+func HasDutyForTrip(ctx context.Context, tx DBTX, tripID int64) (bool, error) {
+	row := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM duty_periods WHERE trip_id = ?)`, tripID)
+	var exists int
+	if err := row.Scan(&exists); err != nil {
+		return false, mapErr(err)
+	}
+	return exists != 0, nil
 }
 
 // GetDuty loads a duty period with its linked segments (ordered by seq).

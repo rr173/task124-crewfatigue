@@ -139,6 +139,11 @@ func (s *Service) CreateDutyForTrip(ctx context.Context, tripID int64, isAugment
 		if len(segs) == 0 {
 			return domain.ErrDutyEmpty
 		}
+		if exists, err := store.HasDutyForTrip(ctx, tx, tripID); err != nil {
+			return err
+		} else if exists {
+			return fmt.Errorf("%w: trip already has a duty period", domain.ErrInvariantViolation)
+		}
 		report := segs[0].ScheduledDep.Add(-domain.ReportLeadMin * time.Minute)
 		release := segs[len(segs)-1].ScheduledArr.Add(domain.ReleaseLagMin * time.Minute)
 		dp := &domain.DutyPeriod{
