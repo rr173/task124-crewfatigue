@@ -8,6 +8,16 @@ import (
 	"task124-crewfatigue/internal/store"
 )
 
+func eventsThrough(events []*domain.ComplianceEvent, asOf time.Time) []*domain.ComplianceEvent {
+	out := make([]*domain.ComplianceEvent, 0, len(events))
+	for _, e := range events {
+		if !e.Ts.After(asOf) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 // rebuildSegmentsInWindow replays SEGMENT_LANDED events and returns the
 // segments whose block time counts toward the rolling window ending at asOf.
 // A segment counts toward a window when its event ts (the actual departure)
@@ -128,10 +138,10 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 	// the event ts (rest end / duty release) so compensatory rests clear the
 	// deficits in the order they were made up.
 	type streamEv struct {
-		ts       time.Time
-		isRest   bool
-		credit   int // compensatory minutes (rest only)
-		gap      int // reduced gap (duty only)
+		ts     time.Time
+		isRest bool
+		credit int // compensatory minutes (rest only)
+		gap    int // reduced gap (duty only)
 	}
 	stream := make([]streamEv, 0, len(duties)+len(events))
 	for _, d := range duties {
