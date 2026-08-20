@@ -21,7 +21,7 @@ import (
 // Service wires the store, schedule service and crew lookup into the
 // compliance engine.
 type Service struct {
-	st *store.Store
+	st  *store.Store
 	sch *schedule.Service
 }
 
@@ -151,7 +151,7 @@ func (s *Service) EvaluateTrip(ctx context.Context, req domain.EvaluateTripReque
 				IsAugmented:      req.IsAugmented,
 				SplitBreakMin:    req.SplitBreakMin,
 				AircraftFacility: ac.RestFacilityClass,
-				ApplyUnforeseen:  false,
+				ApplyUnforeseen:  req.ApplyUnforeseen,
 			},
 		}
 		// Historical windows.
@@ -229,7 +229,7 @@ func (s *Service) EvaluatePersistedTrip(ctx context.Context, crewID, tripID int6
 	}
 	in := domain.EvaluateTripRequest{
 		CrewID: crewID, AircraftType: segs[0].AircraftType,
-		IsAugmented: isAugmented, SplitBreakMin: splitBreakMin,
+		IsAugmented: isAugmented, SplitBreakMin: splitBreakMin, ApplyUnforeseen: applyUnforeseen,
 	}
 	for _, sg := range segs {
 		in.Segments = append(in.Segments, domain.SegmentInput{
@@ -267,9 +267,9 @@ func (s *Service) recheckUnforeseen(ctx context.Context, crewID int64, eval *dom
 		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
 		if used >= domain.UnforeseenYearlyLimit {
 			eval.Violations = append(eval.Violations, domain.Violation{
-				Rule: domain.RuleUnforeseenExtend,
+				Rule:    domain.RuleUnforeseenExtend,
 				Message: fmt.Sprintf("unforeseen extension #%d exceeds yearly limit %d", used+1, domain.UnforeseenYearlyLimit),
-				Actual: fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
+				Actual:  fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
 			})
 			eval.Verdict = domain.VerdictIllegal
 			eval.Metrics.UnforeseenUsedYear = used

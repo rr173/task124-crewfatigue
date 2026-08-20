@@ -72,10 +72,10 @@ const (
 type RestType string
 
 const (
-	RestNormal        RestType = "NORMAL"
-	RestAugmented     RestType = "AUGMENTED"
-	RestSplitCredit   RestType = "SPLIT_CREDIT"
-	RestCompensatory  RestType = "COMPENSATORY"
+	RestNormal       RestType = "NORMAL"
+	RestAugmented    RestType = "AUGMENTED"
+	RestSplitCredit  RestType = "SPLIT_CREDIT"
+	RestCompensatory RestType = "COMPENSATORY"
 )
 
 // IsValid reports whether t is a known rest type.
@@ -111,7 +111,7 @@ const (
 type RuleCode string
 
 const (
-	RuleFDP               RuleCode = "R1_FDP_LIMIT"
+	RuleFDP              RuleCode = "R1_FDP_LIMIT"
 	RuleAugmented        RuleCode = "R2_AUGMENTED_EXTENSION"
 	RuleSplitDuty        RuleCode = "R3_SPLIT_DUTY"
 	RuleCum28d           RuleCode = "R4_28D_FLIGHT_TIME"
@@ -136,9 +136,9 @@ type CrewMember struct {
 
 // AircraftType is a flyable type with an optional rest facility.
 type AircraftType struct {
-	Code               string             `json:"code"`
-	HasRestFacility    bool               `json:"has_rest_facility"`
-	RestFacilityClass  RestFacilityClass  `json:"rest_facility_class"`
+	Code              string            `json:"code"`
+	HasRestFacility   bool              `json:"has_rest_facility"`
+	RestFacilityClass RestFacilityClass `json:"rest_facility_class"`
 }
 
 // Trip groups a sequence of flight segments for one crew member.
@@ -151,32 +151,32 @@ type Trip struct {
 
 // FlightSegment is one leg of a trip.
 type FlightSegment struct {
-	ID            int64     `json:"id"`
-	TripID        int64     `json:"trip_id"`
-	AircraftType   string    `json:"aircraft_type"`
-	DepAirport     string    `json:"dep_airport"`
-	ArrAirport     string    `json:"arr_airport"`
-	ScheduledDep   time.Time `json:"scheduled_dep"`
-	ScheduledArr   time.Time `json:"scheduled_arr"`
-	ActualDep      time.Time `json:"actual_dep,omitempty"`
-	ActualArr      time.Time `json:"actual_arr,omitempty"`
-	BlockTimeMin   int       `json:"block_time_min"`
+	ID           int64     `json:"id"`
+	TripID       int64     `json:"trip_id"`
+	AircraftType string    `json:"aircraft_type"`
+	DepAirport   string    `json:"dep_airport"`
+	ArrAirport   string    `json:"arr_airport"`
+	ScheduledDep time.Time `json:"scheduled_dep"`
+	ScheduledArr time.Time `json:"scheduled_arr"`
+	ActualDep    time.Time `json:"actual_dep,omitempty"`
+	ActualArr    time.Time `json:"actual_arr,omitempty"`
+	BlockTimeMin int       `json:"block_time_min"`
 }
 
 // DutyPeriod wraps one or more consecutive segments with a report/release
 // time and optional augmented-crew / split-duty metadata.
 type DutyPeriod struct {
-	ID                    int64           `json:"id"`
-	CrewID                int64           `json:"crew_id"`
-	TripID                int64           `json:"trip_id"`
-	ReportTime            time.Time       `json:"report_time"`
-	ReleaseTime           time.Time       `json:"release_time"`
-	IsAugmented           bool            `json:"is_augmented"`
-	SplitBreakMin         int             `json:"split_break_min"`
-	Status                DutyStatus      `json:"status"`
+	ID                     int64           `json:"id"`
+	CrewID                 int64           `json:"crew_id"`
+	TripID                 int64           `json:"trip_id"`
+	ReportTime             time.Time       `json:"report_time"`
+	ReleaseTime            time.Time       `json:"release_time"`
+	IsAugmented            bool            `json:"is_augmented"`
+	SplitBreakMin          int             `json:"split_break_min"`
+	Status                 DutyStatus      `json:"status"`
 	UnforeseenExtensionMin int             `json:"unforeseen_extension_min"`
-	OweAugmentedRest      bool            `json:"owe_augmented_rest"`
-	Segments              []FlightSegment `json:"segments"`
+	OweAugmentedRest       bool            `json:"owe_augmented_rest"`
+	Segments               []FlightSegment `json:"segments"`
 }
 
 // FDP returns the flight duty period duration: release − report.
@@ -186,13 +186,13 @@ func (d *DutyPeriod) FDP() time.Duration {
 
 // RestPeriod is a block of crew rest between duty periods.
 type RestPeriod struct {
-	ID            int64     `json:"id"`
-	CrewID        int64     `json:"crew_id"`
-	Start         time.Time `json:"start"`
-	End           time.Time `json:"end"`
-	RestType      RestType  `json:"rest_type"`
-	DurationMin   int       `json:"duration_min"`
-	CoversWeekly  bool      `json:"covers_weekly"`
+	ID           int64     `json:"id"`
+	CrewID       int64     `json:"crew_id"`
+	Start        time.Time `json:"start"`
+	End          time.Time `json:"end"`
+	RestType     RestType  `json:"rest_type"`
+	DurationMin  int       `json:"duration_min"`
+	CoversWeekly bool      `json:"covers_weekly"`
 }
 
 // Duration returns the rest duration.
@@ -219,31 +219,31 @@ type Violation struct {
 
 // EvaluationMetrics carries the numeric detail behind a verdict.
 type EvaluationMetrics struct {
-	FDPMin            int   `json:"fdp_min"`
-	FDPLimitMin       int   `json:"fdp_limit_min"`
-	Used28dMin        int   `json:"used_28d_min"`
-	Limit28dMin       int   `json:"limit_28d_min"`
-	Used168hMin       int   `json:"used_168h_min"`
-	Limit168hMin      int   `json:"limit_168h_min"`
-	Used365dMin       int   `json:"used_365d_min"`
-	Limit365dMin      int   `json:"limit_365d_min"`
-	RestSinceLastMin  int   `json:"rest_since_last_min"`
-	MinRestMin        int   `json:"min_rest_min"`
-	EarlyStartStreak  int   `json:"early_start_streak"`
-	EarlyStartLimit   int   `json:"early_start_limit"`
-	UnforeseenUsedYear int  `json:"unforeseen_used_year"`
-	UnforeseenLimitYear int  `json:"unforeseen_limit_year"`
+	FDPMin              int `json:"fdp_min"`
+	FDPLimitMin         int `json:"fdp_limit_min"`
+	Used28dMin          int `json:"used_28d_min"`
+	Limit28dMin         int `json:"limit_28d_min"`
+	Used168hMin         int `json:"used_168h_min"`
+	Limit168hMin        int `json:"limit_168h_min"`
+	Used365dMin         int `json:"used_365d_min"`
+	Limit365dMin        int `json:"limit_365d_min"`
+	RestSinceLastMin    int `json:"rest_since_last_min"`
+	MinRestMin          int `json:"min_rest_min"`
+	EarlyStartStreak    int `json:"early_start_streak"`
+	EarlyStartLimit     int `json:"early_start_limit"`
+	UnforeseenUsedYear  int `json:"unforeseen_used_year"`
+	UnforeseenLimitYear int `json:"unforeseen_limit_year"`
 }
 
 // LegalityEvaluation is the persisted result of evaluating a trip.
 type LegalityEvaluation struct {
-	ID          int64              `json:"id"`
-	CrewID      int64              `json:"crew_id"`
-	TripID      int64              `json:"trip_id"`
-	EvaluatedAt time.Time          `json:"evaluated_at"`
-	Verdict     Verdict            `json:"verdict"`
-	Violations  []Violation        `json:"violations"`
-	Metrics     EvaluationMetrics  `json:"metrics"`
+	ID          int64             `json:"id"`
+	CrewID      int64             `json:"crew_id"`
+	TripID      int64             `json:"trip_id"`
+	EvaluatedAt time.Time         `json:"evaluated_at"`
+	Verdict     Verdict           `json:"verdict"`
+	Violations  []Violation       `json:"violations"`
+	Metrics     EvaluationMetrics `json:"metrics"`
 }
 
 // CumulativeSnapshot is the derived rolling-window usage for a crew member at
@@ -258,36 +258,37 @@ type CumulativeSnapshot struct {
 
 // RestDebt summarizes a crew member's outstanding rest obligations.
 type RestDebt struct {
-	CrewID                    int64   `json:"crew_id"`
-	AsOf                      time.Time `json:"as_of"`
-	CompensatoryOwedMin       int     `json:"compensatory_owed_min"`
-	CompensatoryDueBy          *time.Time `json:"compensatory_due_by,omitempty"`
-	OwesWeeklyRest             bool    `json:"owes_weekly_rest"`
-	OwesAugmentedRest          bool    `json:"owes_augmented_rest"`
-	EarlyStartStreak          int     `json:"early_start_streak"`
-	UnforeseenUsedYear        int     `json:"unforeseen_used_year"`
+	CrewID              int64      `json:"crew_id"`
+	AsOf                time.Time  `json:"as_of"`
+	CompensatoryOwedMin int        `json:"compensatory_owed_min"`
+	CompensatoryDueBy   *time.Time `json:"compensatory_due_by,omitempty"`
+	OwesWeeklyRest      bool       `json:"owes_weekly_rest"`
+	OwesAugmentedRest   bool       `json:"owes_augmented_rest"`
+	EarlyStartStreak    int        `json:"early_start_streak"`
+	UnforeseenUsedYear  int        `json:"unforeseen_used_year"`
 }
 
 // EvaluateTripRequest is the input to an in-process trip evaluation.
 type EvaluateTripRequest struct {
-	CrewID         int64           `json:"crew_id"`
-	AircraftType    string          `json:"aircraft_type"`
-	IsAugmented     bool            `json:"is_augmented"`
-	SplitBreakMin   int             `json:"split_break_min"`
-	Segments        []SegmentInput  `json:"segments"`
+	CrewID          int64          `json:"crew_id"`
+	AircraftType    string         `json:"aircraft_type"`
+	IsAugmented     bool           `json:"is_augmented"`
+	SplitBreakMin   int            `json:"split_break_min"`
+	ApplyUnforeseen bool           `json:"apply_unforeseen"`
+	Segments        []SegmentInput `json:"segments"`
 }
 
 // SegmentInput is a planned segment for evaluation (times only).
 type SegmentInput struct {
-	DepAirport    string    `json:"dep_airport"`
-	ArrAirport    string    `json:"arr_airport"`
-	ScheduledDep  time.Time `json:"scheduled_dep"`
-	ScheduledArr  time.Time `json:"scheduled_arr"`
+	DepAirport   string    `json:"dep_airport"`
+	ArrAirport   string    `json:"arr_airport"`
+	ScheduledDep time.Time `json:"scheduled_dep"`
+	ScheduledArr time.Time `json:"scheduled_arr"`
 }
 
 // LegalityResult is the output of the fatigue rule evaluation.
 type LegalityResult struct {
-	Verdict    Verdict            `json:"verdict"`
-	Violations []Violation        `json:"violations"`
-	Metrics    EvaluationMetrics  `json:"metrics"`
+	Verdict    Verdict           `json:"verdict"`
+	Violations []Violation       `json:"violations"`
+	Metrics    EvaluationMetrics `json:"metrics"`
 }

@@ -63,10 +63,10 @@ type EvalInput struct {
 // ProposedDuty is the trip under evaluation, normalized from a plan or a
 // closed duty period.
 type ProposedDuty struct {
-	ReportTime  time.Time
-	ReleaseTime time.Time
-	SegmentCount int
-	IsAugmented  bool
+	ReportTime    time.Time
+	ReleaseTime   time.Time
+	SegmentCount  int
+	IsAugmented   bool
 	SplitBreakMin int
 	// AircraftFacility is the rest-facility class of the duty's aircraft type.
 	// Drives R2 augmented extension. NONE disables the extension.
@@ -234,6 +234,9 @@ func fdpLimitMin(in EvalInput) int {
 
 	// R3 split-duty credit: a break >= 3h extends the limit by min(break, 4h).
 	limitMin += domain.SplitCreditMin(in.Proposed.SplitBreakMin)
+	if in.Proposed.ApplyUnforeseen {
+		limitMin += domain.UnforeseenExtendMaxMin
+	}
 	return limitMin
 }
 
