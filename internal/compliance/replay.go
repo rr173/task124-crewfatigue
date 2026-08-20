@@ -46,6 +46,9 @@ func rebuildDutiesInWindow(events []*domain.ComplianceEvent, asOf time.Time, win
 		if e.Kind != domain.EventDutyClosed {
 			continue
 		}
+		if e.Ts.After(asOf) {
+			continue
+		}
 		p, ok := store.DecodePayload(e).(*store.EventPayloadDuty)
 		if !ok || p == nil {
 			continue
@@ -128,10 +131,10 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 	// the event ts (rest end / duty release) so compensatory rests clear the
 	// deficits in the order they were made up.
 	type streamEv struct {
-		ts       time.Time
-		isRest   bool
-		credit   int // compensatory minutes (rest only)
-		gap      int // reduced gap (duty only)
+		ts     time.Time
+		isRest bool
+		credit int // compensatory minutes (rest only)
+		gap    int // reduced gap (duty only)
 	}
 	stream := make([]streamEv, 0, len(duties)+len(events))
 	for _, d := range duties {
@@ -149,6 +152,9 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 	}
 	for _, e := range events {
 		if e.Kind != domain.EventRestCompleted {
+			continue
+		}
+		if e.Ts.After(asOf) {
 			continue
 		}
 		p, ok := store.DecodePayload(e).(*store.EventPayloadRest)
@@ -172,6 +178,9 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 			for i := range open {
 				if credit <= 0 {
 					break
+				}
+				if open[i].deadline.Before(ev.ts) {
+					continue
 				}
 				take := open[i].amount
 				if take > credit {
