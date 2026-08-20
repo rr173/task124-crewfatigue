@@ -92,8 +92,25 @@ func (s *Service) AddSegment(ctx context.Context, seg *domain.FlightSegment) (*d
 			return domain.ErrDutyClosed
 		}
 		// Validate aircraft type exists.
-		if _, err := store.GetAircraft(ctx, tx, seg.AircraftType); err != nil {
+		ac, err := store.GetAircraft(ctx, tx, seg.AircraftType)
+		if err != nil {
 			return err
+		}
+		// Enforce the single-facility-class invariant: the augmented-extension
+		// rule (R2) attributes one rest-facility class to the whole duty period,
+		// so a trip may not mix classes. Reject when the new segment's class
+		// differs from any existing segment's, or when the trip already holds
+		// mixed classes (legacy rows that bypassed this check). Two aircraft
+		// types sharing the same class (e.g. B789 + B777, both CLASS_1) are fine.
+		existing, err := store.DistinctTripFacilityClasses(ctx, tx, seg.TripID)
+		if err != nil {
+			return err
+		}
+		for _, c := range existing {
+			if c != ac.RestFacilityClass {
+				return fmt.Errorf("%w: trip %d mixes rest facility classes %q and %q",
+					domain.ErrInvariantViolation, seg.TripID, c, ac.RestFacilityClass)
+			}
 		}
 		id, err := store.CreateSegment(ctx, tx, seg)
 		if err != nil {

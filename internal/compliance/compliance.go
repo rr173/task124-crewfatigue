@@ -219,13 +219,29 @@ func (s *Service) EvaluatePersistedTrip(ctx context.Context, crewID, tripID int6
 	err := s.st.InTx(ctx, func(tx store.DBTX) error {
 		var gerr error
 		segs, gerr = store.ListSegmentsByTrip(ctx, tx, tripID)
-		return gerr
+		if gerr != nil {
+			return gerr
+		}
+		if len(segs) == 0 {
+			return domain.ErrDutyEmpty
+		}
+		// Enforce the single-facility-class invariant on persisted segments.
+		// Legacy rows inserted directly (bypassing schedule.AddSegment) could
+		// otherwise be evaluated under the first segment's aircraft type
+		// silently. Reject the whole trip instead of guessing which class
+		// governs the (R2) augmented extension.
+		classes, gerr := store.DistinctTripFacilityClasses(ctx, tx, tripID)
+		if gerr != nil {
+			return gerr
+		}
+		if len(classes) > 1 {
+			return fmt.Errorf("%w: trip %d mixes rest facility classes %v",
+				domain.ErrInvariantViolation, tripID, classes)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-	if len(segs) == 0 {
-		return nil, domain.ErrDutyEmpty
 	}
 	in := domain.EvaluateTripRequest{
 		CrewID: crewID, AircraftType: segs[0].AircraftType,

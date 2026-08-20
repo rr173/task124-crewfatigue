@@ -106,6 +106,35 @@ func ListLandedSegmentsBetween(ctx context.Context, tx DBTX, crewID int64, from,
 	return out, rows.Err()
 }
 
+// DistinctTripFacilityClasses returns the distinct rest-facility classes
+// across every segment of a trip, joined to aircraft_types. A trip is
+// consistent iff the result has length <= 1: the augmented-extension rule
+// (R2) attributes a single facility class to the whole duty period, so a trip
+// that mixes classes cannot be evaluated under one class. Used by the
+// schedule layer (to reject an inconsistent segment on insert) and the
+// compliance layer (to reject inconsistent legacy rows on evaluation). The
+// result is unordered.
+func DistinctTripFacilityClasses(ctx context.Context, tx DBTX, tripID int64) ([]domain.RestFacilityClass, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT DISTINCT a.rest_facility_class
+		FROM flight_segments s
+		JOIN aircraft_types a ON a.code = s.aircraft_type
+		WHERE s.trip_id = ?`, tripID)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	defer rows.Close()
+	var out []domain.RestFacilityClass
+	for rows.Next() {
+		var c domain.RestFacilityClass
+		if err := rows.Scan(&c); err != nil {
+			return nil, mapErr(err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // scanSegment scans one flight_segments row from *sql.Row or *sql.Rows.
 func scanSegment(s scanner) (*domain.FlightSegment, error) {
 	var seg domain.FlightSegment
