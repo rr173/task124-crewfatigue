@@ -21,7 +21,7 @@ import (
 // Service wires the store, schedule service and crew lookup into the
 // compliance engine.
 type Service struct {
-	st *store.Store
+	st  *store.Store
 	sch *schedule.Service
 }
 
@@ -177,7 +177,7 @@ func (s *Service) EvaluateTrip(ctx context.Context, req domain.EvaluateTripReque
 		in.EarlyStartStreak = computeEarlyStreak(ctx, tx, req.CrewID, report)
 
 		// R10: unforeseen count this year.
-		used, _ := store.CountEventsKindYear(ctx, tx, req.CrewID, domain.EventUnforeseenExtended, report)
+		used, _ := store.CountEventsKindYearThrough(ctx, tx, req.CrewID, domain.EventUnforeseenExtended, report)
 		in.UnforeseenUsedYear = used
 
 		// R7 compensatory debt: any reduced rest not yet made up.
@@ -264,12 +264,12 @@ func (s *Service) EvaluatePersistedTrip(ctx context.Context, crewID, tripID int6
 // violation. Kept simple: only adds the violation if the quota is exceeded.
 func (s *Service) recheckUnforeseen(ctx context.Context, crewID int64, eval *domain.LegalityEvaluation, asOf time.Time) error {
 	return s.st.InTx(ctx, func(tx store.DBTX) error {
-		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
+		used, _ := store.CountEventsKindYearThrough(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
 		if used >= domain.UnforeseenYearlyLimit {
 			eval.Violations = append(eval.Violations, domain.Violation{
-				Rule: domain.RuleUnforeseenExtend,
+				Rule:    domain.RuleUnforeseenExtend,
 				Message: fmt.Sprintf("unforeseen extension #%d exceeds yearly limit %d", used+1, domain.UnforeseenYearlyLimit),
-				Actual: fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
+				Actual:  fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
 			})
 			eval.Verdict = domain.VerdictIllegal
 			eval.Metrics.UnforeseenUsedYear = used

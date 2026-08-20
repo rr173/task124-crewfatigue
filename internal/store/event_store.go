@@ -58,11 +58,16 @@ func ListEventsForCrew(ctx context.Context, tx DBTX, crewID int64) ([]*domain.Co
 // CountEventsKindYear counts compliance events of the given kind whose ts falls
 // in the calendar year (UTC) of ref. Used for the R10 unforeseen yearly limit.
 func CountEventsKindYear(ctx context.Context, tx DBTX, crewID int64, kind domain.EventKind, ref time.Time) (int, error) {
+	return CountEventsKindYearThrough(ctx, tx, crewID, kind, ref)
+}
+
+// CountEventsKindYearThrough counts events in ref's calendar year up to ref.
+func CountEventsKindYearThrough(ctx context.Context, tx DBTX, crewID int64, kind domain.EventKind, ref time.Time) (int, error) {
 	year := ref.UTC().Year()
 	from := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	to := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := ref.UTC()
 	row := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM compliance_events
-		WHERE crew_id = ? AND kind = ? AND ts >= ? AND ts < ?`,
+		WHERE crew_id = ? AND kind = ? AND ts >= ? AND ts <= ?`,
 		crewID, string(kind), from.Format(time.RFC3339Nano), to.Format(time.RFC3339Nano))
 	var n int
 	if err := row.Scan(&n); err != nil {
@@ -80,19 +85,19 @@ type EventPayloadSegment struct {
 
 // EventPayloadDuty is the decoded payload of a DUTY_CLOSED event.
 type EventPayloadDuty struct {
-	DutyID                  int64 `json:"duty_id"`
-	FDPMin                  int   `json:"fdp_min"`
-	UnforeseenExtensionMin  int   `json:"unforeseen_extension_min"`
-	OweAugmentedRest        bool  `json:"owe_augmented_rest"`
+	DutyID                 int64 `json:"duty_id"`
+	FDPMin                 int   `json:"fdp_min"`
+	UnforeseenExtensionMin int   `json:"unforeseen_extension_min"`
+	OweAugmentedRest       bool  `json:"owe_augmented_rest"`
 }
 
 // EventPayloadRest is the decoded payload of a REST_COMPLETED event.
 type EventPayloadRest struct {
-	RestID       int64  `json:"rest_id"`
-	RestType     string `json:"rest_type"`
-	DurationMin  int    `json:"duration_min"`
-	CoversWeekly bool   `json:"covers_weekly"`
-	CompensatesMin int  `json:"compensates_min"`
+	RestID         int64  `json:"rest_id"`
+	RestType       string `json:"rest_type"`
+	DurationMin    int    `json:"duration_min"`
+	CoversWeekly   bool   `json:"covers_weekly"`
+	CompensatesMin int    `json:"compensates_min"`
 }
 
 // EventPayloadUnforeseen is the decoded payload of an UNFORESEEN_EXTENSION event.
