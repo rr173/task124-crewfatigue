@@ -250,36 +250,82 @@ func (s *Service) EvaluatePersistedTrip(ctx context.Context, crewID, tripID int6
 		return nil, err
 	}
 	eval.TripID = tripID
-	// Apply unforeseen flag retroactively if requested and the evaluation was
-	// otherwise legal (the R10 check ran with ApplyUnforeseen=false above; we
-	// re-check here against the yearly quota to mirror the close path).
+	// Apply the unforeseen extension retroactively if requested. The EvaluateTrip
+	// pass above ran with ApplyUnforeseen=false, so recheckUnforeseen re-runs R10
+	// (yearly quota) AND raises the FDP limit by UnforeseenExtendMaxMin so the
+	// prolongation affects the FDP determination (R1) as well as the annual count.
 	if applyUnforeseen {
 		_ = s.recheckUnforeseen(ctx, crewID, eval, asOf)
 	}
 	return eval, nil
 }
 
-// recheckUnforeseen re-runs the R10 check with ApplyUnforeseen=true and, if a
-// violation arises, updates the persisted verdict to ILLEGAL with the added
-// violation. Kept simple: only adds the violation if the quota is exceeded.
+// recheckUnforeseen re-runs the R10 unforeseen-extension check against the
+// persisted evaluation. The EvaluateTrip pass above ran with ApplyUnforeseen=false,
+// so the FDP limit there did not include the unforeseen prolongation. This pass
+// raises the FDP limit by UnforeseenExtendMaxMin so the extension affects the FDP
+// determination (R1) as well as the yearly quota: it drops the R1 violation when
+// the FDP now fits and refreshes its limit values when it still exceeds. The
+// annual count limit continues to apply — a request beyond UnforeseenYearlyLimit
+// records an R10 violation. The verdict is recomputed from the surviving
+// violations and the (extended) metrics are persisted.
 func (s *Service) recheckUnforeseen(ctx context.Context, crewID int64, eval *domain.LegalityEvaluation, asOf time.Time) error {
 	return s.st.InTx(ctx, func(tx store.DBTX) error {
 		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
+
+		// The unforeseen prolongation also raises the FDP limit, so re-check
+		// R1 against the extended limit (drop or refresh the violation).
+		eval.Metrics.FDPLimitMin += domain.UnforeseenExtendMaxMin
+		reapplyFDPViolation(eval)
+
+		// The annual count limit still applies.
+		eval.Metrics.UnforeseenUsedYear = used
+		eval.Metrics.UnforeseenLimitYear = domain.UnforeseenYearlyLimit
 		if used >= domain.UnforeseenYearlyLimit {
 			eval.Violations = append(eval.Violations, domain.Violation{
-				Rule: domain.RuleUnforeseenExtend,
+				Rule:    domain.RuleUnforeseenExtend,
 				Message: fmt.Sprintf("unforeseen extension #%d exceeds yearly limit %d", used+1, domain.UnforeseenYearlyLimit),
-				Actual: fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
+				Actual:  fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
 			})
-			eval.Verdict = domain.VerdictIllegal
-			eval.Metrics.UnforeseenUsedYear = used
-			eval.Metrics.UnforeseenLimitYear = domain.UnforeseenYearlyLimit
 		}
+
+		// Recompute the verdict from the surviving violations.
+		if len(eval.Violations) > 0 {
+			eval.Verdict = domain.VerdictIllegal
+		} else {
+			eval.Verdict = domain.VerdictLegal
+		}
+
 		vj, _ := json.Marshal(eval.Violations)
-		_, err := tx.ExecContext(ctx, `UPDATE legality_evaluations SET verdict=?, violations_json=? WHERE id=?`,
-			string(eval.Verdict), string(vj), eval.ID)
+		mj, _ := json.Marshal(eval.Metrics)
+		_, err := tx.ExecContext(ctx, `UPDATE legality_evaluations SET verdict=?, violations_json=?, metrics_json=? WHERE id=?`,
+			string(eval.Verdict), string(vj), string(mj), eval.ID)
 		return err
 	})
+}
+
+// reapplyFDPViolation re-checks the R1 (FDP limit) rule against
+// eval.Metrics.FDPLimitMin (already updated to the post-extension value). It
+// drops any existing R1 violation when the FDP now fits, refreshes its
+// message/actual/limit values when it still exceeds, and adds one if the FDP
+// exceeds but no R1 was recorded (defensive — EvaluateTrip already emits R1
+// whenever the FDP exceeds the pre-extension limit).
+func reapplyFDPViolation(eval *domain.LegalityEvaluation) {
+	kept := make([]domain.Violation, 0, len(eval.Violations))
+	for i := range eval.Violations {
+		if eval.Violations[i].Rule != domain.RuleFDP {
+			kept = append(kept, eval.Violations[i])
+		}
+	}
+	if eval.Metrics.FDPMin > eval.Metrics.FDPLimitMin {
+		kept = append(kept, domain.Violation{
+			Rule:    domain.RuleFDP,
+			Message: fmt.Sprintf("FDP %d min exceeds limit %d min", eval.Metrics.FDPMin, eval.Metrics.FDPLimitMin),
+			Actual:  fmt.Sprintf("%d min", eval.Metrics.FDPMin),
+			Limit:   fmt.Sprintf("%d min", eval.Metrics.FDPLimitMin),
+		})
+	}
+	eval.Violations = kept
 }
 
 // GetEvaluation loads an evaluation by ID.
