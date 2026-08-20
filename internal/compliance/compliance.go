@@ -330,15 +330,18 @@ func (s *Service) RestDebt(ctx context.Context, crewID int64, asOf time.Time) (*
 		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
 		// Augmented-rest owed: true if any DUTY_CLOSED event carried owe=true.
 		oweAug := false
+		// R10 requires a full AugmentedRestHours (14h) of completed AUGMENTED
+		// rest to settle the debt — a shorter augmented rest does NOT clear it.
+		augmentedRestMin := domain.AugmentedRestHours * 60
 		for _, e := range events {
 			if e.Kind == domain.EventDutyClosed {
 				if p, ok := store.DecodePayload(e).(*store.EventPayloadDuty); ok && p != nil && p.OweAugmentedRest {
-					// Cleared only by a later AUGMENTED rest.
 					oweAug = true
 				}
 			}
 			if e.Kind == domain.EventRestCompleted {
-				if p, ok := store.DecodePayload(e).(*store.EventPayloadRest); ok && p != nil && p.RestType == string(domain.RestAugmented) {
+				if p, ok := store.DecodePayload(e).(*store.EventPayloadRest); ok && p != nil &&
+					p.RestType == string(domain.RestAugmented) && p.DurationMin >= augmentedRestMin {
 					oweAug = false
 				}
 			}
