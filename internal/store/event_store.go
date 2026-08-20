@@ -56,14 +56,16 @@ func ListEventsForCrew(ctx context.Context, tx DBTX, crewID int64) ([]*domain.Co
 }
 
 // CountEventsKindYear counts compliance events of the given kind whose ts falls
-// in the calendar year (UTC) of ref. Used for the R10 unforeseen yearly limit.
+// in the calendar year (UTC) of ref AND at or before ref. The upper bound is the
+// evaluation moment itself: events registered with a later (future) ts are not
+// yet "used" when evaluating at an earlier as-of, so they must be excluded from
+// the yearly quota. Used for the R10 unforeseen yearly limit.
 func CountEventsKindYear(ctx context.Context, tx DBTX, crewID int64, kind domain.EventKind, ref time.Time) (int, error) {
-	year := ref.UTC().Year()
-	from := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	to := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+	ref = ref.UTC()
+	from := time.Date(ref.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
 	row := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM compliance_events
-		WHERE crew_id = ? AND kind = ? AND ts >= ? AND ts < ?`,
-		crewID, string(kind), from.Format(time.RFC3339Nano), to.Format(time.RFC3339Nano))
+		WHERE crew_id = ? AND kind = ? AND ts >= ? AND ts <= ?`,
+		crewID, string(kind), from.Format(time.RFC3339Nano), ref.Format(time.RFC3339Nano))
 	var n int
 	if err := row.Scan(&n); err != nil {
 		return 0, mapErr(err)
