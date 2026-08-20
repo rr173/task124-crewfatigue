@@ -84,8 +84,12 @@ func lastDutyReleaseBefore(events []*domain.ComplianceEvent, ref time.Time) time
 // is the gap between the previous duty's release and this duty's report that
 // falls in [MinRestReducedHours, MinRestHours) — it is allowed once but creates
 // a deficit of (MinRest - gap) that must be made up by a COMPENSATORY
-// REST_COMPLETED event within CompensatoryWindowHours. A subsequent reduced
-// rest while a deficit is outstanding is the R7 violation the evaluator flags.
+// REST_COMPLETED event within CompensatoryWindowHours. A compensatory rest
+// registered after a deficit's deadline cannot retroactively satisfy it: only
+// deficits whose make-up window is still open at the rest's completion time
+// are credited, so a late rest leaves the deficit outstanding. A subsequent
+// reduced rest while a deficit is outstanding is the R7 violation the
+// evaluator flags.
 //
 // Returns the remaining deficit (minutes) and the earliest outstanding
 // deadline (nil if none).
@@ -172,6 +176,13 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 			for i := range open {
 				if credit <= 0 {
 					break
+				}
+				// A compensatory rest registered (completed) after a deficit's
+				// 72h deadline cannot retroactively satisfy it: only deficits
+				// whose make-up window is still open at the rest's completion
+				// time are credited. A late rest leaves the deficit outstanding.
+				if ev.ts.After(open[i].deadline) {
+					continue
 				}
 				take := open[i].amount
 				if take > credit {
