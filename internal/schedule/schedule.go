@@ -132,6 +132,15 @@ func (s *Service) CreateDutyForTrip(ctx context.Context, tripID int64, isAugment
 		if err != nil {
 			return err
 		}
+		// BUG10: a trip holds at most one duty period. The service layer
+		// rejects a duplicate before building the duty object; the storage layer
+		// (store.CreateDuty) re-checks so the invariant holds even for direct
+		// store callers. Together they guarantee no duplicate rows or events.
+		if has, err := store.DutyExistsForTrip(ctx, tx, tripID); err != nil {
+			return err
+		} else if has {
+			return fmt.Errorf("%w: trip %d already has a duty period", domain.ErrInvariantViolation, tripID)
+		}
 		segs, err := store.ListSegmentsByTrip(ctx, tx, tripID)
 		if err != nil {
 			return err

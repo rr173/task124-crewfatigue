@@ -30,6 +30,9 @@ func mapErr(err error) error {
 		return fmtWrap(domain.ErrCrewExists, err)
 	case strings.Contains(s, "UNIQUE constraint failed: aircraft_types"):
 		return fmtWrap(domain.ErrAircraftExists, err)
+	case strings.Contains(s, "UNIQUE constraint failed: duty_periods"):
+		// The trip_id UNIQUE constraint (BUG10): one duty period per trip, ever.
+		return fmtWrap(domain.ErrInvariantViolation, err)
 	case strings.Contains(s, "FOREIGN KEY constraint failed"):
 		return errors.New("foreign key constraint failed: referenced row does not exist")
 	}

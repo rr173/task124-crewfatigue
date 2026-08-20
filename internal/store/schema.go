@@ -65,6 +65,10 @@ CREATE TABLE IF NOT EXISTS duty_periods (
 	status                   TEXT NOT NULL DEFAULT 'OPEN',
 	unforeseen_extension_min INTEGER NOT NULL DEFAULT 0,
 	owe_augmented_rest       INTEGER NOT NULL DEFAULT 0,
+	-- A trip holds at most one duty period (BUG10). The UNIQUE constraint is the
+	-- hard DB-level guard; store.CreateDuty also checks programmatically so the
+	-- rule holds even on databases opened from a pre-fix schema snapshot.
+	UNIQUE(trip_id),
 	FOREIGN KEY (crew_id) REFERENCES crew_members(id),
 	FOREIGN KEY (trip_id) REFERENCES trips(id)
 );

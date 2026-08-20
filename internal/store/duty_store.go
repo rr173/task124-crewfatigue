@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,6 +29,19 @@ func CreateDuty(ctx context.Context, tx DBTX, d *domain.DutyPeriod, segIDs []int
 	}
 	if d.Status == "" {
 		d.Status = domain.DutyOpen
+	}
+	// BUG10: a trip holds at most one duty period. The storage layer enforces
+	// this before the INSERT so callers that bypass the schedule service (or
+	// reopen a database created before the UNIQUE constraint existed) still get
+	// a clear rejection instead of a duplicate row. The UNIQUE(trip_id) schema
+	// constraint is the backstop for concurrent paths.
+	var existingID int64
+	switch qerr := tx.QueryRowContext(ctx, `SELECT id FROM duty_periods WHERE trip_id = ?`, d.TripID).Scan(&existingID); {
+	case qerr == nil:
+		return 0, fmt.Errorf("%w: trip %d already has a duty period (existing duty_id=%d)",
+			domain.ErrInvariantViolation, d.TripID, existingID)
+	case !errors.Is(qerr, sql.ErrNoRows):
+		return 0, fmt.Errorf("check existing duty for trip %d: %w", d.TripID, qerr)
 	}
 	res, err := tx.ExecContext(ctx, `INSERT INTO duty_periods
 		(crew_id, trip_id, report_time, release_time, is_augmented, split_break_min, status,
@@ -62,6 +77,18 @@ func GetDuty(ctx context.Context, tx DBTX, id int64) (*domain.DutyPeriod, error)
 	}
 	d.Segments = segs
 	return d, nil
+}
+
+// DutyExistsForTrip reports whether a trip already has a duty period. A trip
+// holds at most one duty period (BUG10); the schedule service consults this to
+// reject a second creation before doing any work. COUNT(*) always returns a
+// row, so the no-rows path that mapErr would otherwise mis-map never fires.
+func DutyExistsForTrip(ctx context.Context, tx DBTX, tripID int64) (bool, error) {
+	var n int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM duty_periods WHERE trip_id = ?`, tripID).Scan(&n); err != nil {
+		return false, mapErr(err)
+	}
+	return n > 0, nil
 }
 
 // ListDutyPeriods lists duty periods optionally filtered by crew_id and/or
