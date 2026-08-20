@@ -45,6 +45,25 @@ func GetTrip(ctx context.Context, tx DBTX, id int64) (*domain.Trip, error) {
 	return &t, nil
 }
 
+// GetTripForCrew loads a trip only when it belongs to the requested crew.
+func GetTripForCrew(ctx context.Context, tx DBTX, tripID, crewID int64) (*domain.Trip, error) {
+	row := tx.QueryRowContext(ctx, `SELECT id, crew_id, planned, created_at FROM trips WHERE id = ? AND crew_id = ?`, tripID, crewID)
+	var t domain.Trip
+	var planned int
+	var created string
+	if err := row.Scan(&t.ID, &t.CrewID, &planned, &created); err != nil {
+		return nil, mapErr(err)
+	}
+	t.Planned = planned != 0
+	if created != "" {
+		parsed, err := time.Parse(time.RFC3339Nano, created)
+		if err == nil {
+			t.CreatedAt = parsed.UTC()
+		}
+	}
+	return &t, nil
+}
+
 // ListTrips lists trips optionally filtered by crew_id.
 func ListTrips(ctx context.Context, tx DBTX, crewID int64) ([]*domain.Trip, error) {
 	q := `SELECT id, crew_id, planned, created_at FROM trips`
