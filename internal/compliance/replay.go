@@ -87,6 +87,11 @@ func lastDutyReleaseBefore(events []*domain.ComplianceEvent, ref time.Time) time
 // REST_COMPLETED event within CompensatoryWindowHours. A subsequent reduced
 // rest while a deficit is outstanding is the R7 violation the evaluator flags.
 //
+// The replay is strictly bounded by asOf: a duty whose report (the instant a
+// reduced rest is taken and the deficit arises) falls after asOf, and a rest
+// that completes after asOf, are both excluded. They have not happened at the
+// evaluation instant and must not contaminate an earlier-time evaluation.
+//
 // Returns the remaining deficit (minutes) and the earliest outstanding
 // deadline (nil if none).
 func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (int, *time.Time) {
@@ -95,7 +100,9 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 		release time.Time
 	}
 	// Collect closed duty periods from DUTY_CLOSED events (release = event ts,
-	// report = release - FDP).
+	// report = release - FDP). Bounded by asOf: a deficit arises at the duty's
+	// report, so a duty reporting after asOf has not yet taken its reduced rest
+	// and is excluded from the replay.
 	var duties []closed
 	for _, e := range events {
 		if e.Kind != domain.EventDutyClosed {
@@ -107,6 +114,9 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 		}
 		release := e.Ts
 		report := release.Add(-time.Duration(p.FDPMin) * time.Minute)
+		if report.After(asOf) {
+			continue
+		}
 		duties = append(duties, closed{report: report, release: release})
 	}
 	// Sort by report time (stable: insertion sort; small N per crew).
@@ -128,10 +138,10 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 	// the event ts (rest end / duty release) so compensatory rests clear the
 	// deficits in the order they were made up.
 	type streamEv struct {
-		ts       time.Time
-		isRest   bool
-		credit   int // compensatory minutes (rest only)
-		gap      int // reduced gap (duty only)
+		ts     time.Time
+		isRest bool
+		credit int // compensatory minutes (rest only)
+		gap    int // reduced gap (duty only)
 	}
 	stream := make([]streamEv, 0, len(duties)+len(events))
 	for _, d := range duties {
@@ -156,6 +166,11 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 			continue
 		}
 		if p.RestType != string(domain.RestCompensatory) {
+			continue
+		}
+		// Bounded by asOf: a rest ending after asOf has not yet completed and
+		// cannot have cleared any deficit, so it must not be replayed.
+		if e.Ts.After(asOf) {
 			continue
 		}
 		stream = append(stream, streamEv{ts: e.Ts, isRest: true, credit: p.DurationMin})
