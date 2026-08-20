@@ -213,11 +213,27 @@ func (s *Service) EvaluateTrip(ctx context.Context, req domain.EvaluateTripReque
 }
 
 // EvaluatePersistedTrip evaluates the segments of an existing trip (read from
-// the store) and persists the result linked to that trip.
+// the store) and persists the result linked to that trip. The trip must belong
+// to the requesting crew: crewID is the request identity and the trip's
+// CrewID is its ownership, and the two must agree — otherwise a caller could
+// pass crew B's identity with crew A's trip id and have that trip read and
+// evaluated. This guard is the single check that ties the persisted itinerary
+// to the caller, so it runs before any segment is loaded.
 func (s *Service) EvaluatePersistedTrip(ctx context.Context, crewID, tripID int64, isAugmented bool, splitBreakMin int, applyUnforeseen bool, asOf time.Time) (*domain.LegalityEvaluation, error) {
 	var segs []*domain.FlightSegment
 	err := s.st.InTx(ctx, func(tx store.DBTX) error {
-		var gerr error
+		// Verify itinerary ownership against the request identity: load the
+		// trip and require trip.CrewID == crewID. A missing trip surfaces as a
+		// not-found error; a trip that belongs to another crew is reported as
+		// not found too, so the caller cannot probe or evaluate trips it does
+		// not own.
+		trip, gerr := store.GetTrip(ctx, tx, tripID)
+		if gerr != nil {
+			return gerr
+		}
+		if trip.CrewID != crewID {
+			return domain.ErrTripNotFound
+		}
 		segs, gerr = store.ListSegmentsByTrip(ctx, tx, tripID)
 		return gerr
 	})
