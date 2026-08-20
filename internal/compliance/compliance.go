@@ -21,7 +21,7 @@ import (
 // Service wires the store, schedule service and crew lookup into the
 // compliance engine.
 type Service struct {
-	st *store.Store
+	st  *store.Store
 	sch *schedule.Service
 }
 
@@ -267,9 +267,9 @@ func (s *Service) recheckUnforeseen(ctx context.Context, crewID int64, eval *dom
 		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
 		if used >= domain.UnforeseenYearlyLimit {
 			eval.Violations = append(eval.Violations, domain.Violation{
-				Rule: domain.RuleUnforeseenExtend,
+				Rule:    domain.RuleUnforeseenExtend,
 				Message: fmt.Sprintf("unforeseen extension #%d exceeds yearly limit %d", used+1, domain.UnforeseenYearlyLimit),
-				Actual: fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
+				Actual:  fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
 			})
 			eval.Verdict = domain.VerdictIllegal
 			eval.Metrics.UnforeseenUsedYear = used
@@ -328,21 +328,7 @@ func (s *Service) RestDebt(ctx context.Context, crewID int64, asOf time.Time) (*
 		owesWeekly := !hasWeeklyRestInRests(toDomainRests(rests168), asOf)
 		streak := computeEarlyStreak(ctx, tx, crewID, asOf)
 		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
-		// Augmented-rest owed: true if any DUTY_CLOSED event carried owe=true.
-		oweAug := false
-		for _, e := range events {
-			if e.Kind == domain.EventDutyClosed {
-				if p, ok := store.DecodePayload(e).(*store.EventPayloadDuty); ok && p != nil && p.OweAugmentedRest {
-					// Cleared only by a later AUGMENTED rest.
-					oweAug = true
-				}
-			}
-			if e.Kind == domain.EventRestCompleted {
-				if p, ok := store.DecodePayload(e).(*store.EventPayloadRest); ok && p != nil && p.RestType == string(domain.RestAugmented) {
-					oweAug = false
-				}
-			}
-		}
+		oweAug := augmentedDebtAsOf(events, asOf)
 		debt = &domain.RestDebt{
 			CrewID: crewID, AsOf: asOf,
 			CompensatoryOwedMin: compMin, CompensatoryDueBy: dueBy,
