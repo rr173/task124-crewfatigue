@@ -21,7 +21,7 @@ import (
 // Service wires the store, schedule service and crew lookup into the
 // compliance engine.
 type Service struct {
-	st *store.Store
+	st  *store.Store
 	sch *schedule.Service
 }
 
@@ -227,6 +227,11 @@ func (s *Service) EvaluatePersistedTrip(ctx context.Context, crewID, tripID int6
 	if len(segs) == 0 {
 		return nil, domain.ErrDutyEmpty
 	}
+	for _, sg := range segs[1:] {
+		if sg.AircraftType != segs[0].AircraftType {
+			return nil, fmt.Errorf("%w: persisted trip mixes aircraft types %q and %q", domain.ErrInvariantViolation, segs[0].AircraftType, sg.AircraftType)
+		}
+	}
 	in := domain.EvaluateTripRequest{
 		CrewID: crewID, AircraftType: segs[0].AircraftType,
 		IsAugmented: isAugmented, SplitBreakMin: splitBreakMin,
@@ -267,9 +272,9 @@ func (s *Service) recheckUnforeseen(ctx context.Context, crewID int64, eval *dom
 		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
 		if used >= domain.UnforeseenYearlyLimit {
 			eval.Violations = append(eval.Violations, domain.Violation{
-				Rule: domain.RuleUnforeseenExtend,
+				Rule:    domain.RuleUnforeseenExtend,
 				Message: fmt.Sprintf("unforeseen extension #%d exceeds yearly limit %d", used+1, domain.UnforeseenYearlyLimit),
-				Actual: fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
+				Actual:  fmt.Sprintf("%d", used+1), Limit: fmt.Sprintf("%d", domain.UnforeseenYearlyLimit),
 			})
 			eval.Verdict = domain.VerdictIllegal
 			eval.Metrics.UnforeseenUsedYear = used

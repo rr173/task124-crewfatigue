@@ -95,6 +95,13 @@ func (s *Service) AddSegment(ctx context.Context, seg *domain.FlightSegment) (*d
 		if _, err := store.GetAircraft(ctx, tx, seg.AircraftType); err != nil {
 			return err
 		}
+		existing, err := store.ListSegmentsByTrip(ctx, tx, seg.TripID)
+		if err != nil {
+			return err
+		}
+		if len(existing) > 0 && existing[0].AircraftType != seg.AircraftType {
+			return fmt.Errorf("%w: trip mixes aircraft types %q and %q", domain.ErrInvariantViolation, existing[0].AircraftType, seg.AircraftType)
+		}
 		id, err := store.CreateSegment(ctx, tx, seg)
 		if err != nil {
 			return err
