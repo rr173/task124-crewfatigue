@@ -128,10 +128,10 @@ func computeCompensatoryDebt(events []*domain.ComplianceEvent, asOf time.Time) (
 	// the event ts (rest end / duty release) so compensatory rests clear the
 	// deficits in the order they were made up.
 	type streamEv struct {
-		ts       time.Time
-		isRest   bool
-		credit   int // compensatory minutes (rest only)
-		gap      int // reduced gap (duty only)
+		ts     time.Time
+		isRest bool
+		credit int // compensatory minutes (rest only)
+		gap    int // reduced gap (duty only)
 	}
 	stream := make([]streamEv, 0, len(duties)+len(events))
 	for _, d := range duties {
@@ -283,6 +283,26 @@ func hasWeeklyRestInRests(rests []domain.RestPeriod, asOf time.Time) bool {
 		}
 	}
 	return false
+}
+
+func augmentedDebtAsOf(events []*domain.ComplianceEvent, asOf time.Time) bool {
+	owed := false
+	for _, e := range events {
+		if e.Ts.After(asOf) {
+			continue
+		}
+		if e.Kind == domain.EventDutyClosed {
+			if p, ok := store.DecodePayload(e).(*store.EventPayloadDuty); ok && p != nil && p.OweAugmentedRest {
+				owed = true
+			}
+		}
+		if e.Kind == domain.EventRestCompleted {
+			if p, ok := store.DecodePayload(e).(*store.EventPayloadRest); ok && p != nil && p.RestType == string(domain.RestAugmented) && p.DurationMin >= domain.AugmentedRestHours*60 {
+				owed = false
+			}
+		}
+	}
+	return owed
 }
 
 // toDomainRests converts []*RestPeriod to a value slice.
