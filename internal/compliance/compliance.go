@@ -328,18 +328,34 @@ func (s *Service) RestDebt(ctx context.Context, crewID int64, asOf time.Time) (*
 		owesWeekly := !hasWeeklyRestInRests(toDomainRests(rests168), asOf)
 		streak := computeEarlyStreak(ctx, tx, crewID, asOf)
 		used, _ := store.CountEventsKindYear(ctx, tx, crewID, domain.EventUnforeseenExtended, asOf)
-		// Augmented-rest owed: true if any DUTY_CLOSED event carried owe=true.
+		// Augmented-rest owed: a DUTY_CLOSED event whose duty took an unforeseen
+		// extension (OweAugmentedRest) creates an augmented-rest obligation.
+		// The debt is cleared only by an AUGMENTED rest that has actually been
+		// completed by asOf — its end (the REST_COMPLETED event's ts) must be at
+		// or before asOf (time boundary) AND its duration must meet the
+		// augmented-rest minimum (AugmentedRestHours). A future rest that has not
+		// yet ended, or a rest too short, must not clear the debt. Events whose
+		// ts is beyond asOf have not happened yet at the evaluation instant, so
+		// they can neither create nor clear the obligation.
 		oweAug := false
+		augmentedRestMin := domain.AugmentedRestHours * 60
 		for _, e := range events {
+			// Time boundary: ignore events that have not occurred by asOf.
+			if e.Ts.After(asOf) {
+				continue
+			}
 			if e.Kind == domain.EventDutyClosed {
 				if p, ok := store.DecodePayload(e).(*store.EventPayloadDuty); ok && p != nil && p.OweAugmentedRest {
-					// Cleared only by a later AUGMENTED rest.
 					oweAug = true
 				}
 			}
 			if e.Kind == domain.EventRestCompleted {
 				if p, ok := store.DecodePayload(e).(*store.EventPayloadRest); ok && p != nil && p.RestType == string(domain.RestAugmented) {
-					oweAug = false
+					// Clear only when the rest is completed (end <= asOf, enforced
+					// above) and satisfies the augmented-rest duration.
+					if p.DurationMin >= augmentedRestMin {
+						oweAug = false
+					}
 				}
 			}
 		}
