@@ -193,12 +193,20 @@ func (s *Service) CloseDuty(ctx context.Context, dutyID int64, applyUnforeseenMi
 		if err := store.CloseDuty(ctx, tx, dutyID, ext, owe); err != nil {
 			return err
 		}
-		// Record SEGMENT_LANDED events for each segment.
+		// Record SEGMENT_LANDED events for each segment. The event ts is the
+		// segment's actual departure so that a segment departing earlier than
+		// planned is attributed to its actual departure window in both the live
+		// cumulative and the restart replay; fall back to the scheduled
+		// departure when the actual time is not yet recorded.
 		for _, sg := range dp.Segments {
 			payload := store.EventPayloadSegment{SegmentID: sg.ID, BlockTimeMin: sg.BlockTimeMin, TripID: dp.TripID}
 			pj, _ := encodeJSON(payload)
+			dep := sg.ActualDep
+			if dep.IsZero() {
+				dep = sg.ScheduledDep
+			}
 			ev := &domain.ComplianceEvent{
-				CrewID: dp.CrewID, Ts: sg.ScheduledDep.UTC(), Kind: domain.EventSegmentLanded, PayloadJSON: pj,
+				CrewID: dp.CrewID, Ts: dep.UTC(), Kind: domain.EventSegmentLanded, PayloadJSON: pj,
 			}
 			if _, err := store.AppendEvent(ctx, tx, ev); err != nil {
 				return err
